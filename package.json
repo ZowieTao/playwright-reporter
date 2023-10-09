@@ -1,0 +1,13 @@
+{
+  "name": "twitter-selector-updater",
+  "version": "1.0.0",
+  "main": "index.js",
+  "repository": "git@github.com:ZowieTao/playwright-reporter.git",
+  "author": "Zowie <zowietao@gmail.com>",
+  "license": "MIT",
+  "devDependencies": {
+    "@playwright/test": "^1.38.1",
+    "@types/node": "^20.8.3"
+  },
+  "scripts": {}
+}

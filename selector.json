@@ -1,0 +1,47 @@
+{
+  "lastUpdateTime": "1695106363005",
+  "e2eID": "data-testid",
+  "tabBar": {
+    "home": "a[data-testid=\"AppTabBar_Home_Link\"]",
+    "explore": "a[data-testid=\"AppTabBar_Explore_Link\"]"
+  },
+  "actions": {
+    "bookmark": {
+      "firstArticle": "article[data-testid=\"tweet\"][tabindex=\"-1\"][role=\"article\"]",
+      "bookmarkButton": "div[data-testid$=\"ookmark\"]"
+    },
+    "follow": {
+      "profile": "div[aria-label=\"Home timeline\"][tabindex=\"0\"]:not([data-testid=\"sidebarColumn\"])",
+      "followButton": "div[role=\"button\"][aria-label^=\"Follow\"]"
+    },
+    "getAccountStatistic": {
+      "userName": "div[data-testid=\"UserName\"]"
+    },
+    "getHotTweet": {
+      "exploreButton": "a[data-testid=\"AppTabBar_Explore_Link\"]",
+      "searchInput": "input[data-testid=\"SearchBox_Search_Input\"]",
+      "emptyResult": "div[data-testid=\"emptyState\"]",
+      "searchForm": "form[role=\"search\"]",
+      "cellInnerDiv": "div[data-testid=\"cellInnerDiv\"]",
+      "tweetArticle": "article[data-testid=\"tweet\"]"
+    },
+    "like": {
+      "firstArticle": "article[data-testid=\"tweet\"][tabindex=\"-1\"][role=\"article\"]",
+      "likeButton": "div[data-testid$=\"like\"]"
+    },
+    "reply": {
+      "editable": "div[contenteditable=\"true\"]",
+      "tweetButtonInline": "div[data-testid=\"tweetButtonInline\"]"
+    },
+    "retweet": {
+      "firstArticle": "article[data-testid=\"tweet\"][tabindex=\"-1\"][role=\"article\"]",
+      "retweetMenuButton": "div[data-testid$=\"retweet\"]",
+      "retweetConfirmButton": "#react-root div[data-testid=\"retweetConfirm\"]"
+    },
+    "sendTweet": {
+      "home": "a[data-testid=\"AppTabBar_Home_Link\"]",
+      "toolBar": "div[data-testid=\"toolBar\"]",
+      "tweetButtonInline": "div[data-testid=\"tweetButtonInline\"]"
+    }
+  }
+}

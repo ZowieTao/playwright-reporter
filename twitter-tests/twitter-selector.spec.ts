@@ -55,7 +55,13 @@ const selector = {
 let sharedContext: BrowserContext;
 
 test.beforeAll(async ({ browser }) => {
-  sharedContext = await browser.newContext();
+  try {
+    sharedContext = await browser.newContext({
+      storageState: "state.local.json",
+    });
+  } catch (error) {
+    sharedContext = await browser.newContext();
+  }
 });
 
 test.afterAll(async () => {
@@ -70,31 +76,45 @@ test.describe("Twitter test", () => {
     const newPage = await sharedContext.newPage();
     await newPage.goto("https://twitter.com/i/flow/login");
 
-    await newPage.fill(
-      'input[autocomplete="username"]',
-      process.env.TWITTER_TEST_ACCOUNT ?? ""
+    const cookie = (await sharedContext.cookies("https://twitter.com/")).filter(
+      (val) => {
+        return val.name === "auth_token";
+      }
     );
 
-    await newPage.keyboard.press("Tab");
-    await newPage.keyboard.press("Enter");
+    if (cookie.length > 0) {
+      await newPage.goto("https://twitter.com/home");
+    } else {
+      await newPage.fill(
+        'input[autocomplete="username"]',
+        process.env.TWITTER_TEST_ACCOUNT as string
+      );
 
-    // Fill in the login form
-    await newPage.fill(
-      'input[autocomplete="current-password"]',
-      process.env.TWITTER_TEST_PASSWORD ?? ""
-    );
-    await newPage.keyboard.press("Tab");
-    await newPage.keyboard.press("Tab");
-    await newPage.keyboard.press("Tab");
-    await newPage.keyboard.press("Enter");
+      await newPage.keyboard.press("Tab");
+      await newPage.keyboard.press("Enter");
 
+      // Fill in the login form
+      await newPage.fill(
+        'input[autocomplete="current-password"]',
+        process.env.TWITTER_TEST_PASSWORD as string
+      );
+      await newPage.keyboard.press("Tab");
+      await newPage.keyboard.press("Tab");
+      await newPage.keyboard.press("Tab");
+      await newPage.keyboard.press("Enter");
+    }
     await newPage.waitForTimeout(1000); // 等待1秒钟
 
-    // Assert that the login was successful
-    const loggedInUserName = await newPage.textContent(
+    const btnText = await newPage.textContent(
       'div[data-testid="SideNav_AccountSwitcher_Button"]'
     );
-    expect(loggedInUserName).toContain("ZowieTao");
+
+    // Assert that the login was successful
+    expect(btnText).toContain(process.env.TWITTER_TEST_ACCOUNT as string);
+
+    sharedContext.storageState({ path: "state.local.json" });
+
+    // test.fail(true, "Test 1 failed");
 
     await newPage.close(); // 关闭页面
   });

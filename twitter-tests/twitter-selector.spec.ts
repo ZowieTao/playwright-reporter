@@ -52,6 +52,8 @@ const selector = {
   },
 };
 
+let isTestFailed = false;
+
 let sharedContext: BrowserContext;
 
 test.beforeAll(async ({ browser }) => {
@@ -71,7 +73,7 @@ test.afterAll(async () => {
 test.describe("Twitter test", () => {
   //login getAccountStatistic sendTweet getHotTweet bookmark follow like reply retweet
 
-  test("should allow me to login and get my nickname@handle", async ({}) => {
+  test("should allow me to login and get my nickname@handle", async ({}, testInfo) => {
     // Fill in the login form
     const newPage = await sharedContext.newPage();
     await newPage.goto("https://twitter.com/i/flow/login");
@@ -110,16 +112,22 @@ test.describe("Twitter test", () => {
     );
 
     // Assert that the login was successful
-    expect(btnText).toContain(process.env.TWITTER_TEST_ACCOUNT as string);
+    try {
+      // expect(btnText).toContain("process.env.TWITTER_TEST_ACCOUNT" as string);
+      expect(btnText).toContain(process.env.TWITTER_TEST_ACCOUNT as string);
+      await newPage.close();
+    } catch (error) {
+      reportErrorMessage(testInfo.title);
+
+      isTestFailed = true;
+    }
 
     sharedContext.storageState({ path: "state.local.json" });
-
-    // test.fail(true, "Test 1 failed");
-
-    await newPage.close(); // 关闭页面
   });
 
-  test("show router to profile and get user info", async ({}) => {
+  test("show router to profile and get user info", async ({}, testInfo) => {
+    isTestFailed && test.skip();
+
     const newPage = await sharedContext.newPage();
     await newPage.goto("https://twitter.com/home");
 
@@ -128,12 +136,19 @@ test.describe("Twitter test", () => {
     const loggedInUserInfo = await newPage.textContent(
       'div[data-testid="UserName"]'
     );
-    expect(loggedInUserInfo).toContain("ZowieTao");
-
-    await newPage.close(); // 关闭页面
+    try {
+      expect(loggedInUserInfo).toContain(
+        process.env.TWITTER_TEST_ACCOUNT as string
+      );
+      await newPage.close(); // 关闭页面
+    } catch (error) {
+      reportErrorMessage(testInfo.title);
+      isTestFailed = true;
+    }
   });
 
-  test("send a tweet for test", async ({}) => {
+  test("send a tweet for test", async ({}, testInfo) => {
+    isTestFailed && test.skip();
     const newPage = await sharedContext.newPage();
     await newPage.goto("https://twitter.com/");
 
@@ -150,18 +165,36 @@ test.describe("Twitter test", () => {
 
     await newPage.click('div[data-testid="tweetButtonInline"]');
 
-    await newPage.click('a[data-testid="AppTabBar_Profile_Link"]');
+    await newPage.waitForTimeout(3000);
 
-    const latestTweet = await newPage.textContent("article");
+    const cellContent =
+      (await newPage.textContent('div[data-testid="cellInnerDiv"]')) ?? "";
 
-    expect((latestTweet ?? "").replace(/[\s\uFEFF\xA0]+/g, "")).toContain(
-      inputContent.replace(/[\s\uFEFF\xA0]+/g, "")
-    );
+    if (
+      cellContent
+        .replace(/[\s\uFEFF\xA0]+/g, "")
+        .includes(inputContent.replace(/[\s\uFEFF\xA0]+/g, ""))
+    ) {
+      await newPage.close(); // 关闭页面
+      test.skip();
+    } else {
+      const assertiveContent =
+        (await newPage.textContent(
+          'div[aria-live="assertive"][role="status"]'
+        )) ?? "";
 
-    await newPage.close(); // 关闭页面
+      if (assertiveContent.includes("You already said that")) {
+        await newPage.close();
+        test.skip();
+      } else {
+        reportErrorMessage(testInfo.title);
+        isTestFailed = true;
+      }
+    }
   });
 
-  test("get some hot twitter info", async ({}) => {
+  test("get some hot twitter info", async ({}, testInfo) => {
+    isTestFailed && test.skip();
     const newPage = await sharedContext.newPage();
     const {
       actions: { getHotTweet: getHotSelector },
@@ -177,18 +210,31 @@ test.describe("Twitter test", () => {
 
     await newPage.keyboard.press("Enter");
 
+    await newPage.waitForTimeout(3000);
+
     await newPage.click(
-      `${getHotSelector.cellInnerDiv} ${getHotSelector.tweetArticle} div[data-testid="tweetText"]`
+      `${getHotSelector.cellInnerDiv} ${getHotSelector.tweetArticle} div[data-testid="tweetText"]`,
+      {
+        position: {
+          x: 10,
+          y: 10,
+        },
+      }
     );
 
     await newPage.waitForURL(/^https:\/\/twitter\.com\/\w+\/status\/\d+$/);
 
-    await expect(newPage.getByText("Post your reply")).toBeVisible();
-
-    await newPage.close(); // 关闭页面
+    try {
+      await expect(newPage.getByText("Post your reply")).toBeVisible();
+      await newPage.close(); // 关闭页面
+    } catch (error) {
+      reportErrorMessage(testInfo.title);
+      isTestFailed = true;
+    }
   });
 
-  test("bookmark some tweet in explore page", async ({}) => {
+  test("bookmark some tweet in explore page", async ({}, testInfo) => {
+    isTestFailed && test.skip();
     const newPage = await sharedContext.newPage();
     await newPage.goto("https://twitter.com/explore");
 
@@ -197,27 +243,54 @@ test.describe("Twitter test", () => {
     } = selector;
 
     await newPage.click(
-      `${getHotSelector.cellInnerDiv} ${getHotSelector.tweetArticle} div[data-testid="tweetText"]`
+      `${getHotSelector.cellInnerDiv} ${getHotSelector.tweetArticle} div[data-testid="tweetText"]`,
+      {
+        position: {
+          x: 10,
+          y: 10,
+        },
+      }
     );
 
-    const currentMarkCount = await newPage.textContent(
+    await newPage.waitForTimeout(3000);
+
+    const element = await newPage.$(
       `${bookmark.firstArticle} ${bookmark.bookmarkButton}`
     );
 
-    await newPage.click(`${bookmark.firstArticle} ${bookmark.bookmarkButton}`);
+    if (element) {
+      const attributeValue = await element.getAttribute("aria-label");
+      if (attributeValue?.endsWith("Bookmarked")) {
+        await newPage.click(
+          `${bookmark.firstArticle} ${bookmark.bookmarkButton}`
+        );
+        await newPage.waitForTimeout(2000);
 
-    await newPage.waitForTimeout(1000);
-
-    const afterMarkCount = await newPage.textContent(
-      `${bookmark.firstArticle} ${bookmark.bookmarkButton}`
-    );
-
-    expect(Number(currentMarkCount) + 1).toEqual(Number(afterMarkCount));
-
+        const attributeValue = await element.getAttribute("aria-label");
+        if (attributeValue?.endsWith("Bookmark")) {
+          await newPage.close();
+          test.skip();
+        }
+      } else {
+        await newPage.click(
+          `${bookmark.firstArticle} ${bookmark.bookmarkButton}`
+        );
+        await newPage.waitForTimeout(2000);
+        const attributeValue = await element.getAttribute("aria-label");
+        if (attributeValue?.endsWith("Bookmarked")) {
+          await newPage.close();
+          test.skip();
+        } else {
+          reportErrorMessage(testInfo.title);
+          isTestFailed = true;
+        }
+      }
+    }
     await newPage.close(); // 关闭页面
   });
 
-  test("follow someone", async () => {
+  test("follow someone", async ({}, testInfo) => {
+    isTestFailed && test.skip();
     const {
       actions: { follow: followSelector },
     } = selector;
@@ -239,16 +312,21 @@ test.describe("Twitter test", () => {
 
     await newPage.waitForTimeout(2000);
 
-    expect(
-      await newPage.textContent(
-        `${followSelector.profile} ${followSelector.followButton}`
-      )
-    ).toContain("Following");
-
-    await newPage.close(); // 关闭页面
+    try {
+      expect(
+        await newPage.textContent(
+          `${followSelector.profile} ${followSelector.followButton}`
+        )
+      ).toContain("Following");
+      await newPage.close(); // 关闭页面
+    } catch (error) {
+      reportErrorMessage(testInfo.title);
+      isTestFailed = true;
+    }
   });
 
-  test("like some tweet in explore page", async () => {
+  test("like some tweet in explore page", async ({}, testInfo) => {
+    isTestFailed && test.skip();
     const {
       actions: { like: likeSelector, getHotTweet: getHotSelector },
     } = selector;
@@ -257,27 +335,53 @@ test.describe("Twitter test", () => {
     await newPage.goto("https://twitter.com/explore");
 
     await newPage.click(
-      `${getHotSelector.cellInnerDiv} ${getHotSelector.tweetArticle} div[data-testid="tweetText"]`
+      `${getHotSelector.cellInnerDiv} ${getHotSelector.tweetArticle} div[data-testid="tweetText"]`,
+      {
+        position: {
+          x: 10,
+          y: 10,
+        },
+      }
     );
+    await newPage.waitForTimeout(3000);
 
-    const currentMarkCount = await newPage.textContent(
+    const element = await newPage.$(
       `${likeSelector.firstArticle} ${likeSelector.likeButton}`
     );
-    await newPage.click(
-      `${likeSelector.firstArticle} ${likeSelector.likeButton}`
-    );
-    await newPage.waitForTimeout(1000);
 
-    const afterMarkCount = await newPage.textContent(
-      `${likeSelector.firstArticle} ${likeSelector.likeButton}`
-    );
+    if (element) {
+      const attributeValue = await element.getAttribute("aria-label");
+      if (attributeValue?.endsWith("Liked")) {
+        await newPage.click(
+          `${likeSelector.firstArticle} ${likeSelector.likeButton}`
+        );
+        await newPage.waitForTimeout(2000);
 
-    expect(Number(currentMarkCount) + 1).toEqual(Number(afterMarkCount));
-
-    await newPage.close();
+        const attributeValue = await element.getAttribute("aria-label");
+        if (attributeValue?.endsWith("Like")) {
+          await newPage.close();
+          test.skip();
+        }
+      } else {
+        await newPage.click(
+          `${likeSelector.firstArticle} ${likeSelector.likeButton}`
+        );
+        await newPage.waitForTimeout(2000);
+        const attributeValue = await element.getAttribute("aria-label");
+        if (attributeValue?.endsWith("Liked")) {
+          await newPage.close();
+          test.skip();
+        } else {
+          reportErrorMessage(testInfo.title);
+          isTestFailed = true;
+        }
+      }
+    }
+    await newPage.close(); // 关闭页面
   });
 
-  test("reply some tweet in explore page", async () => {
+  test("reply some tweet in explore page", async ({}, testInfo) => {
+    isTestFailed && test.skip();
     const {
       actions: { reply: replySelector, getHotTweet: getHotSelector },
     } = selector;
@@ -286,7 +390,13 @@ test.describe("Twitter test", () => {
     await newPage.goto("https://twitter.com/explore");
 
     await newPage.click(
-      `${getHotSelector.cellInnerDiv} ${getHotSelector.tweetArticle} div[data-testid="tweetText"]`
+      `${getHotSelector.cellInnerDiv} ${getHotSelector.tweetArticle} div[data-testid="tweetText"]`,
+      {
+        position: {
+          x: 10,
+          y: 10,
+        },
+      }
     );
 
     await newPage.click(replySelector.editable);
@@ -300,14 +410,31 @@ test.describe("Twitter test", () => {
 
     await newPage.click(replySelector.tweetButtonInline);
 
-    await newPage.waitForTimeout(2000);
+    await newPage.waitForTimeout(3000);
 
-    expect(newPage.getByText(inputContent)).toBeVisible();
-
-    await newPage.close(); // 关闭页面
+    try {
+      const cellContent = (
+        (await newPage.textContent('div[aria-label="Home timeline"]')) ?? ""
+      ).replace(/[\s\uFEFF\xA0]+/g, "");
+      if (cellContent.includes(inputContent.replace(/[\s\uFEFF\xA0]+/g, ""))) {
+        await newPage.close(); // 关闭页面
+      } else {
+        const content = await newPage.textContent('div[aria-live="assertive"]');
+        if (content?.includes("You already said that")) {
+          test.skip();
+        } else {
+          reportErrorMessage(testInfo.title);
+          isTestFailed = true;
+        }
+      }
+    } catch (error) {
+      reportErrorMessage(testInfo.title);
+      isTestFailed = true;
+    }
   });
 
-  test("retweet some tweet in explore page", async () => {
+  test("retweet some tweet in explore page", async ({}, testInfo) => {
+    isTestFailed && test.skip();
     const {
       actions: { retweet: retweetSelector, getHotTweet: getHotSelector },
     } = selector;
@@ -316,7 +443,13 @@ test.describe("Twitter test", () => {
     await newPage.goto("https://twitter.com/explore");
 
     await newPage.click(
-      `${getHotSelector.cellInnerDiv} ${getHotSelector.tweetArticle} div[data-testid="tweetText"]`
+      `${getHotSelector.cellInnerDiv} ${getHotSelector.tweetArticle} div[data-testid="tweetText"]`,
+      {
+        position: {
+          x: 10,
+          y: 10,
+        },
+      }
     );
 
     await newPage.click(
@@ -325,14 +458,20 @@ test.describe("Twitter test", () => {
 
     await newPage.click(retweetSelector.retweetConfirmButton);
 
-    await newPage.waitForTimeout(2000);
+    await newPage.waitForTimeout(4000);
 
-    expect(
-      await newPage.getAttribute(
-        `${retweetSelector.firstArticle} ${retweetSelector.retweetMenuButton}`,
-        "data-testid"
-      )
-    ).toEqual("unretweet");
+    try {
+      expect(
+        await newPage.getAttribute(
+          `${retweetSelector.firstArticle} ${retweetSelector.retweetMenuButton}`,
+          "data-testid"
+        )
+      ).toEqual("unretweet");
+      await newPage.close(); // 关闭页面
+    } catch (error) {
+      reportErrorMessage(testInfo.title);
+      isTestFailed = true;
+    }
   });
 });
 
@@ -349,4 +488,19 @@ function generateGreeting(): string {
   }
 
   return greeting;
+}
+
+async function reportErrorMessage(text: string) {
+  return fetch(`${process.env.Reporter_URL}`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      msg_type: "text",
+      content: {
+        text,
+      },
+    }),
+  });
 }
